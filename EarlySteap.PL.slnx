@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/Solution Items/">
+    <File Path=".gitignore" />
+  </Folder>
+  <Project Path="EarlyStep.BLL/EarlyStep.BLL.csproj" />
+  <Project Path="EarlyStep.Contracts/EarlyStep.Contracts.csproj" Id="405240ad-3401-40cd-b98d-b1372c9bd8b9" />
+  <Project Path="EarlyStep.DAL/EarlyStep.DAL.csproj" />
+  <Project Path="EarlySteap.PL/EarlySteap.PL.csproj" />
+</Solution>
