@@ -2,7 +2,7 @@
 
 
 public class UserAdminResponse
-{
+    {
     public Guid Id { get; set; }
 
     public string FullName { get; set; }
@@ -11,4 +11,4 @@ public class UserAdminResponse
 
     public string Role { get; set; }
     public bool EmailConfirmed { get; set; }
-}
+    }

@@ -9,7 +9,7 @@ using Microsoft.EntityFrameworkCore;
 namespace EarlyStep.BLL.Repository;
 
 public class SuperAdminRepository : ISuperAdminRepository
-{
+    {
     private readonly ApplicationDbContext _context;
     private readonly UserManager<ApplicationUser> _userManager;
     private readonly RoleManager<ApplicationRole> _roleManager;
@@ -18,15 +18,15 @@ public class SuperAdminRepository : ISuperAdminRepository
         ApplicationDbContext context,
         UserManager<ApplicationUser> userManager,
         RoleManager<ApplicationRole> roleManager)
-    {
+        {
         _context = context;
         _userManager = userManager;
         _roleManager = roleManager;
-    }
+        }
 
     public async Task<SuperAdminDashboardResponse> GetDashboardAsync(
         CancellationToken cancellationToken = default)
-    {
+        {
 
 
         var totalUsers = await _userManager.Users
@@ -54,21 +54,21 @@ public class SuperAdminRepository : ISuperAdminRepository
 
 
         foreach (var role in roles)
-        {
+            {
             var usersInRole = await _userManager
                 .GetUsersInRoleAsync(role);
 
             usersByRole.Add(new RoleCountResponse
-            {
+                {
                 Role = role,
                 Count = usersInRole.Count
-            });
-        }
+                });
+            }
 
 
 
         return new SuperAdminDashboardResponse
-        {
+            {
             TotalUsers = totalUsers,
 
             TotalReports = totalReports,
@@ -77,19 +77,19 @@ public class SuperAdminRepository : ISuperAdminRepository
 
             UsersByRole = usersByRole,
 
-        };
-    }
+            };
+        }
 
     public async Task<List<UserAdminResponse>> GetUsersAsync(
         UserFilterRequest request,
         CancellationToken cancellationToken = default)
-    {
+        {
         var users = _userManager.Users
             .AsQueryable();
 
 
         if (!string.IsNullOrWhiteSpace(request.Search))
-        {
+            {
             var search = request.Search.Trim();
 
             users = users.Where(x =>
@@ -98,7 +98,7 @@ public class SuperAdminRepository : ISuperAdminRepository
 
                 (x.Email != null &&
                  x.Email.Contains(search)));
-        }
+            }
 
 
         var userList = await users
@@ -110,7 +110,7 @@ public class SuperAdminRepository : ISuperAdminRepository
 
 
         foreach (var user in userList)
-        {
+            {
             var roles = await _userManager
                 .GetRolesAsync(user);
 
@@ -118,14 +118,14 @@ public class SuperAdminRepository : ISuperAdminRepository
             // Filter By Role
 
             if (!string.IsNullOrWhiteSpace(request.Role))
-            {
+                {
                 if (!roles.Contains(request.Role))
                     continue;
-            }
+                }
 
 
             result.Add(new UserAdminResponse
-            {
+                {
                 Id = user.Id,
 
                 FullName = user.FullName ?? "",
@@ -135,12 +135,12 @@ public class SuperAdminRepository : ISuperAdminRepository
                 Role = roles.FirstOrDefault() ?? "",
 
                 EmailConfirmed = user.EmailConfirmed
-            });
-        }
+                });
+            }
 
 
         return result;
-    }
+        }
 
 
 
@@ -148,7 +148,7 @@ public class SuperAdminRepository : ISuperAdminRepository
     public async Task<List<ChildAdminResponse>> GetChildrenAsync(
         ChildFilterRequest request,
         CancellationToken cancellationToken = default)
-    {
+        {
         var children = _context.Children
             .Include(x => x.Parent)
             .AsQueryable();
@@ -157,12 +157,12 @@ public class SuperAdminRepository : ISuperAdminRepository
         // Search By Child Name
 
         if (!string.IsNullOrWhiteSpace(request.Name))
-        {
+            {
             var name = request.Name.Trim();
 
             children = children.Where(x =>
                 x.FullName.Contains(name));
-        }
+            }
 
 
         var result = await children
@@ -171,7 +171,7 @@ public class SuperAdminRepository : ISuperAdminRepository
 
         return result
             .Select(x => new ChildAdminResponse
-            {
+                {
                 Id = x.Id,
 
                 FullName = x.FullName,
@@ -184,7 +184,291 @@ public class SuperAdminRepository : ISuperAdminRepository
                 ParentName = x.Parent != null
                     ? x.Parent.UserName!
                     : ""
-            })
+                })
             .ToList();
+        }
+    public async Task<UserManagementResponse?> CreateUserAsync(
+        CreateUserRequest request,
+        CancellationToken cancellationToken = default)
+        {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var fullName = request.FullName?.Trim();
+        var email = request.Email?.Trim();
+        var role = request.Role?.Trim();
+
+        // 1. Validate input
+        if (string.IsNullOrWhiteSpace(fullName) ||
+            string.IsNullOrWhiteSpace(email) ||
+            string.IsNullOrWhiteSpace(role) ||
+            string.IsNullOrWhiteSpace(request.Password))
+            {
+            throw new ArgumentException(
+                "Full name, email, password and role are required.");
+            }
+
+        // 2. Validate role
+        if (!IsAllowedManagedRole(role) ||
+            !await _roleManager.RoleExistsAsync(role))
+            {
+            throw new ArgumentException(
+                "Invalid or unauthorized user role.");
+            }
+
+        // 3. Check duplicate email
+        var existingUser = await _userManager.FindByEmailAsync(email);
+
+        if (existingUser is not null)
+            {
+            throw new InvalidOperationException(
+                "Email is already registered.");
+            }
+
+        // 4. Create user
+        var user = new ApplicationUser
+            {
+            Id = Guid.NewGuid(),
+            FullName = fullName,
+            Email = email,
+            UserName = email,
+            IsActive = true,
+            CreatedAt = DateTime.UtcNow
+            };
+
+        // 5. Save user with password
+        var createResult = await _userManager.CreateAsync(
+            user,
+            request.Password);
+
+        if (!createResult.Succeeded)
+            {
+            throw new ArgumentException(
+                string.Join("; ",
+                    createResult.Errors.Select(e => e.Description)));
+            }
+
+        // 6. Assign role
+        var roleResult = await _userManager.AddToRoleAsync(
+            user,
+            role);
+
+        if (!roleResult.Succeeded)
+            {
+            var rollbackResult = await _userManager.DeleteAsync(user);
+
+            if (!rollbackResult.Succeeded)
+                {
+                throw new InvalidOperationException(
+                    "Role assignment failed and user rollback failed.");
+                }
+
+            throw new InvalidOperationException(
+                string.Join("; ",
+                    roleResult.Errors.Select(e => e.Description)));
+            }
+
+        // 7. Return user information
+        return new UserManagementResponse
+            {
+            Message = "User created successfully.",
+            Id = user.Id,
+            FullName = user.FullName,
+            Email = user.Email ?? string.Empty,
+            Role = role,
+            IsActive = user.IsActive
+            };
+        }
+    public async Task<UserManagementResponse?> UpdateUserAsync(
+    Guid userId,
+    UpdateUserRequest request,
+    CancellationToken cancellationToken = default)
+        {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        // 1. Get user
+        var user = await _userManager.FindByIdAsync(
+            userId.ToString());
+
+        if (user is null)
+            return null;
+
+        // 2. Prevent editing SuperAdmin accounts
+        if (await _userManager.IsInRoleAsync(user, "SuperAdmin"))
+            {
+            throw new InvalidOperationException(
+                "SuperAdmin accounts cannot be modified.");
+            }
+
+        var fullName = request.FullName?.Trim();
+        var email = request.Email?.Trim();
+        var newRole = request.Role?.Trim();
+
+        // 3. Validate input
+        if (string.IsNullOrWhiteSpace(fullName) ||
+            string.IsNullOrWhiteSpace(email) ||
+            string.IsNullOrWhiteSpace(newRole))
+            {
+            throw new ArgumentException(
+                "Full name, email and role are required.");
+            }
+
+        // 4. Validate new role
+        if (!IsAllowedManagedRole(newRole) ||
+            !await _roleManager.RoleExistsAsync(newRole))
+            {
+            throw new ArgumentException(
+                "Invalid or unauthorized user role.");
+            }
+
+        // 5. Check duplicate email
+        var existingEmailUser =
+            await _userManager.FindByEmailAsync(email);
+
+        if (existingEmailUser is not null &&
+            existingEmailUser.Id != user.Id)
+            {
+            throw new InvalidOperationException(
+                "Email is already registered.");
+            }
+
+        // 6. Get existing roles
+        var currentRoles = await _userManager.GetRolesAsync(user);
+
+        // 7. Start transaction
+        await using var transaction =
+            await _context.Database.BeginTransactionAsync(
+                cancellationToken);
+
+        try
+            {
+            // 8. Update user information
+            user.FullName = fullName;
+            user.Email = email;
+            user.UserName = email;
+            user.IsActive = request.IsActive;
+
+            var updateResult = await _userManager.UpdateAsync(user);
+
+            if (!updateResult.Succeeded)
+                {
+                throw new ArgumentException(
+                    string.Join("; ",
+                        updateResult.Errors.Select(e => e.Description)));
+                }
+
+            // 9. Add new role if necessary
+            if (!currentRoles.Contains(newRole))
+                {
+                var addResult = await _userManager.AddToRoleAsync(
+                    user,
+                    newRole);
+
+                if (!addResult.Succeeded)
+                    {
+                    throw new InvalidOperationException(
+                        string.Join("; ",
+                            addResult.Errors.Select(e => e.Description)));
+                    }
+                }
+
+            // 10. Remove old roles
+            var oldRoles = currentRoles
+                .Where(r => r != newRole)
+                .ToArray();
+
+            if (oldRoles.Length > 0)
+                {
+                var removeResult =
+                    await _userManager.RemoveFromRolesAsync(
+                        user,
+                        oldRoles);
+
+                if (!removeResult.Succeeded)
+                    {
+                    throw new InvalidOperationException(
+                        string.Join("; ",
+                            removeResult.Errors.Select(e => e.Description)));
+                    }
+                }
+
+            // 11. Commit transaction
+            await transaction.CommitAsync(cancellationToken);
+
+            // 12. Return updated information
+            return new UserManagementResponse
+                {
+                Message = "User updated successfully.",
+                Id = user.Id,
+                FullName = user.FullName,
+                Email = user.Email ?? string.Empty,
+                Role = newRole,
+                IsActive = user.IsActive
+                };
+            }
+        catch
+            {
+            await transaction.RollbackAsync(
+                cancellationToken);
+
+            throw;
+            }
+        }
+    public async Task<IdentityResult> DeleteUserAsync(
+    Guid userId,
+    Guid currentSuperAdminId,
+    CancellationToken cancellationToken = default)
+        {
+        cancellationToken.ThrowIfCancellationRequested();
+
+        if (userId == currentSuperAdminId)
+            {
+            return IdentityResult.Failed(new IdentityError
+                {
+                Code = "Forbidden",
+                Description = "You cannot deactivate your own account."
+                });
+            }
+
+        var user = await _userManager.FindByIdAsync(
+            userId.ToString());
+
+        if (user is null)
+            {
+            return IdentityResult.Failed(new IdentityError
+                {
+                Code = "NotFound",
+                Description = "User not found."
+                });
+            }
+
+        if (await _userManager.IsInRoleAsync(user, "SuperAdmin"))
+            {
+            return IdentityResult.Failed(new IdentityError
+                {
+                Code = "Forbidden",
+                Description = "SuperAdmin accounts cannot be deactivated here."
+                });
+            }
+
+        if (!user.IsActive)
+            return IdentityResult.Success;
+
+        user.IsActive = false;
+
+        return await _userManager.UpdateAsync(user);
+        }
+
+    private static bool IsAllowedManagedRole(string role)
+        {
+        var allowedRoles = new HashSet<string>(
+            StringComparer.Ordinal)
+    {
+        "ولي أمر",
+        "معلم/ة",
+        "أخصائي/ة",
+        "Admin"
+    };
+
+        return allowedRoles.Contains(role);
+        }
     }
-}

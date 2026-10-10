@@ -14,5 +14,6 @@ public interface IAuthRepository
     Task<IdentityResult> ChangePasswordAsync(string userId, ChangePasswordRequest request, CancellationToken cancellationToken = default);
     Task<string?> ForgotPassword(ForgotPasswordRequest forgotPasswordRequest, CancellationToken cancellationToken = default);
     Task<IdentityResult> ResetPasswordAsync(ResetPasswordRequest request, CancellationToken cancellationToken = default);
+    Task<CurrentUserResponse?> GetCurrentUserAsync(Guid userId, CancellationToken cancellationToken = default);
 
-}
+    }

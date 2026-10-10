@@ -1,5 +1,6 @@
 ﻿using EarlyStep.BLL.Interfaces;
 using EarlyStep.Contracts.DTOS.Requests.AccountRequests;
+using EarlyStep.Contracts.DTOS.Responses.AccountResponses;
 using EarlyStep.DAL.Model;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
@@ -158,5 +159,24 @@ public class AuthController : ControllerBase
         return Ok(new { message = "تم تير كلمة السر بنجاح." });
         }
 
+    [HttpGet("me")]
+    [Authorize]
+    public async Task<ActionResult<CurrentUserResponse>> GetMe(
+    CancellationToken cancellationToken)
+        {
+        var userIdValue = User.FindFirstValue(
+            ClaimTypes.NameIdentifier);
 
+        if (!Guid.TryParse(userIdValue, out var userId))
+            return Unauthorized();
+
+        var result = await _authRepository.GetCurrentUserAsync(
+            userId,
+            cancellationToken);
+
+        if (result is null)
+            return Unauthorized();
+
+        return Ok(result);
+        }
     }

@@ -253,4 +253,26 @@ public class AuthRepository : IAuthRepository
         });
         }
 
+    public async Task<CurrentUserResponse?> GetCurrentUserAsync(
+    Guid userId,
+    CancellationToken cancellationToken = default)
+        {
+        var user = await _userManager.FindByIdAsync(userId.ToString());
+
+        if (user is null || !user.IsActive)
+            return null;
+
+        cancellationToken.ThrowIfCancellationRequested();
+
+        var roles = await _userManager.GetRolesAsync(user);
+
+        return new CurrentUserResponse
+            {
+            Id = user.Id,
+            FullName = user.FullName,
+            Email = user.Email ?? string.Empty,
+            Roles = roles
+            };
+        }
+
     }
