@@ -309,8 +309,8 @@ namespace EarlyStep.DAL.Migrations
                     b.Property<Guid>("QuestionId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<Guid?>("SelectedOptionId")
-                        .HasColumnType("uniqueidentifier");
+                    b.Property<string>("SelectedOptionIdsJson")
+                        .HasColumnType("nvarchar(max)");
 
                     b.HasKey("Id");
 
@@ -440,9 +440,6 @@ namespace EarlyStep.DAL.Migrations
                     b.Property<int>("Order")
                         .HasColumnType("int");
 
-                    b.Property<string>("PairKey")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<Guid>("QuestionId")
                         .HasColumnType("uniqueidentifier");
 
@@ -524,9 +521,6 @@ namespace EarlyStep.DAL.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<string>("Answer")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<DateTime>("AnsweredAt")
                         .HasColumnType("datetime2");
 
@@ -536,15 +530,14 @@ namespace EarlyStep.DAL.Migrations
                     b.Property<Guid>("QuestionId")
                         .HasColumnType("uniqueidentifier");
 
-                    b.Property<int?>("ResponseTimeSeconds")
-                        .HasColumnType("int");
+                    b.Property<string>("SelectedOptionIdsJson")
+                        .IsRequired()
+                        .HasColumnType("nvarchar(max)");
 
                     b.Property<Guid>("TrainingPlanActivityId")
                         .HasColumnType("uniqueidentifier");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("QuestionId");
 
                     b.HasIndex("TrainingPlanActivityId");
 
@@ -982,19 +975,11 @@ namespace EarlyStep.DAL.Migrations
 
             modelBuilder.Entity("EarlyStep.DAL.Model.TrainingPlanQuestionAnswer", b =>
                 {
-                    b.HasOne("EarlyStep.DAL.Model.ActivityQuestion", "Question")
-                        .WithMany()
-                        .HasForeignKey("QuestionId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("TrainingPlanActivity", "TrainingPlanActivity")
-                        .WithMany("Answers")
+                        .WithMany("QuestionAnswers")
                         .HasForeignKey("TrainingPlanActivityId")
-                        .OnDelete(DeleteBehavior.Cascade)
+                        .OnDelete(DeleteBehavior.Restrict)
                         .IsRequired();
-
-                    b.Navigation("Question");
 
                     b.Navigation("TrainingPlanActivity");
                 });
@@ -1195,7 +1180,7 @@ namespace EarlyStep.DAL.Migrations
 
             modelBuilder.Entity("TrainingPlanActivity", b =>
                 {
-                    b.Navigation("Answers");
+                    b.Navigation("QuestionAnswers");
                 });
 #pragma warning restore 612, 618
         }

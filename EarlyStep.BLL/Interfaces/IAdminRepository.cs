@@ -19,6 +19,9 @@ public interface IAdminRepository
     Task<AdminUserDetailsResponse?> GetUserByIdAsync(
         Guid userId,
         CancellationToken cancellationToken = default);
+    Task<List<AdminSpecialistResponse>> GetAllSpecialistsAsync(
+CancellationToken cancellationToken = default);
+
 
     Task<bool> AssignChildrenToSpecialistAsync(
         AssignChildrenToSpecialistRequest request,

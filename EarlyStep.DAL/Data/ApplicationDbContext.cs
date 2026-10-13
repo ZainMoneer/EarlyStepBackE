@@ -123,7 +123,11 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             .WithMany(c => c.Reports)
             .HasForeignKey(r => r.ChildId)
             .OnDelete(DeleteBehavior.Cascade);
-
+        builder.Entity<TrainingPlanQuestionAnswer>()
+            .HasOne(a => a.TrainingPlanActivity)
+            .WithMany(a => a.QuestionAnswers)
+            .HasForeignKey(a => a.TrainingPlanActivityId)
+            .OnDelete(DeleteBehavior.Restrict);
         builder.Entity<Report>()
             .HasOne(r => r.Specialist)
             .WithMany(u => u.ReportsCreated)

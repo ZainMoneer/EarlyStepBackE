@@ -11,22 +11,22 @@ using Microsoft.EntityFrameworkCore;
 namespace EarlyStep.BLL.Repository;
 
 public class AdminRepository : IAdminRepository
-{
+    {
     private readonly ApplicationDbContext _context;
     private readonly UserManager<ApplicationUser> _userManager;
 
     public AdminRepository(
         ApplicationDbContext context,
         UserManager<ApplicationUser> userManager)
-    {
+        {
         _context = context;
         _userManager = userManager;
-    }
+        }
 
 
     public async Task<AdminDashboardResponse> GetDashboardAsync(
         CancellationToken cancellationToken = default)
-    {
+        {
         var totalUsers = await _userManager.Users
             .CountAsync(cancellationToken);
 
@@ -43,19 +43,19 @@ public class AdminRepository : IAdminRepository
         var totalChildreen = await _context.Children.CountAsync(cancellationToken);
 
         return new AdminDashboardResponse
-        {
+            {
             TotalUsers = totalUsers,
             TotalReports = totalReports,
             TotalActivities = totalActivities,
             TotalCategories = totalCategories,
             TotalChildreen = totalChildreen
-        };
-    }
+            };
+        }
 
     public async Task<AdminUsersResponse> GetUsersAsync(
         UserFilterRequest request,
         CancellationToken cancellationToken = default)
-    {
+        {
 
 
         var parents = await _userManager
@@ -85,7 +85,7 @@ public class AdminRepository : IAdminRepository
 
 
         foreach (var user in users)
-        {
+            {
             var roles = await _userManager
                 .GetRolesAsync(user);
 
@@ -95,26 +95,26 @@ public class AdminRepository : IAdminRepository
             // Role Filter
 
             if (!string.IsNullOrWhiteSpace(request.Role))
-            {
+                {
                 if (!roles.Contains(request.Role))
                     continue;
-            }
+                }
 
 
             // Search By Name Only
 
             if (!string.IsNullOrWhiteSpace(request.Search))
-            {
+                {
                 var search = request.Search.Trim();
 
                 if (string.IsNullOrWhiteSpace(user.FullName) ||
                     !user.FullName.Contains(
                         search,
                         StringComparison.OrdinalIgnoreCase))
-                {
+                    {
                     continue;
+                    }
                 }
-            }
 
             // Children Count
 
@@ -123,37 +123,37 @@ public class AdminRepository : IAdminRepository
 
             // ولي أمر
             if (roles.Contains("ولي أمر"))
-            {
+                {
                 childrenCount = await _context.Children
                     .CountAsync(
                         x => x.ParentId == user.Id,
                         cancellationToken);
-            }
+                }
 
 
             // أخصائي
             else if (roles.Contains("أخصائي/ة"))
-            {
+                {
                 childrenCount = await _context.Children
                     .CountAsync(
                         x => x.SpecialistId == user.Id,
                         cancellationToken);
-            }
+                }
 
 
             // معلم
             else if (roles.Contains("معلم/ة"))
-            {
+                {
                 childrenCount = await _context.TrainingPlans
                     .Where(x => x.TeacherId == user.Id)
                     .Select(x => x.ChildId)
                     .Distinct()
                     .CountAsync(cancellationToken);
-            }
+                }
 
 
             result.Add(new AdminUserResponse
-            {
+                {
                 Id = user.Id,
 
                 FullName = user.FullName,
@@ -165,13 +165,13 @@ public class AdminRepository : IAdminRepository
                 EmailConfirmed = user.EmailConfirmed,
 
                 ChildrenCount = childrenCount
-            });
-        }
+                });
+            }
 
 
 
         return new AdminUsersResponse
-        {
+            {
             TotalUsers = result.Count,
 
             TotalParents = parents.Count,
@@ -181,19 +181,36 @@ public class AdminRepository : IAdminRepository
             TotalTeachers = teachers.Count,
 
             Users = result
-        };
-    }
+            };
+        }
+    public async Task<List<AdminSpecialistResponse>> GetAllSpecialistsAsync(
+    CancellationToken cancellationToken = default)
+        {
+        var specialists = await _userManager
+            .GetUsersInRoleAsync("أخصائي/ة");
+
+        return specialists
+            .Select(user => new AdminSpecialistResponse
+                {
+                Id = user.Id,
+                FullName = user.FullName,
+                Email = user.Email,
+                IsActive = user.IsActive
+                })
+            .OrderBy(user => user.FullName)
+            .ToList();
+        }
 
 
     public async Task<bool> AssignChildrenToSpecialistAsync(
         AssignChildrenToSpecialistRequest request,
         CancellationToken cancellationToken = default)
-    {
+        {
         if (request.ChildIds == null ||
             request.ChildIds.Count == 0)
-        {
+            {
             return false;
-        }
+            }
 
 
         var specialist = await _userManager
@@ -226,22 +243,22 @@ public class AdminRepository : IAdminRepository
 
 
         foreach (var child in children)
-        {
+            {
             child.SpecialistId = request.SpecialistId;
-        }
+            }
 
 
         await _context.SaveChangesAsync(
             cancellationToken);
 
         return true;
-    }
+        }
 
     //هذه الفنكشن هي اللي تجيب الأطفال لما تضغطي على المستخدم.
     public async Task<AdminUserDetailsResponse?> GetUserByIdAsync(
     Guid userId,
     CancellationToken cancellationToken = default)
-    {
+        {
         var user = await _userManager.Users
             .FirstOrDefaultAsync(
                 x => x.Id == userId,
@@ -264,14 +281,14 @@ public class AdminRepository : IAdminRepository
 
 
         if (roles.Contains("ولي أمر"))
-        {
+            {
             children = await _context.Children
                 .Include(x => x.Parent)
                 .Include(x => x.Specialist)
                 .Where(x => x.ParentId == userId)
                 .AsNoTracking()
                 .Select(x => new AdminChildResponse
-                {
+                    {
                     Id = x.Id,
 
                     FullName = x.FullName,
@@ -290,20 +307,20 @@ public class AdminRepository : IAdminRepository
                     SpecialistName = x.Specialist != null
                         ? x.Specialist.FullName
                         : null
-                })
+                    })
                 .ToListAsync(cancellationToken);
-        }
+            }
 
 
         else if (roles.Contains("أخصائي/ة"))
-        {
+            {
             children = await _context.Children
                 .Include(x => x.Parent)
                 .Include(x => x.Specialist)
                 .Where(x => x.SpecialistId == userId)
                 .AsNoTracking()
                 .Select(x => new AdminChildResponse
-                {
+                    {
                     Id = x.Id,
 
                     FullName = x.FullName,
@@ -322,12 +339,12 @@ public class AdminRepository : IAdminRepository
                     SpecialistName = x.Specialist != null
                         ? x.Specialist.FullName
                         : null
-                })
+                    })
                 .ToListAsync(cancellationToken);
-        }
+            }
 
         else if (roles.Contains("معلم/ة"))
-        {
+            {
             children = await _context.TrainingPlans
                 .Where(x => x.TeacherId == userId)
                 .Include(x => x.Child)
@@ -338,7 +355,7 @@ public class AdminRepository : IAdminRepository
                 .Distinct()
                 .AsNoTracking()
                 .Select(x => new AdminChildResponse
-                {
+                    {
                     Id = x.Id,
 
                     FullName = x.FullName,
@@ -358,13 +375,13 @@ public class AdminRepository : IAdminRepository
                     SpecialistName = x.Specialist != null
                         ? x.Specialist.FullName
                         : null
-                })
+                    })
                 .ToListAsync(cancellationToken);
-        }
+            }
 
 
         return new AdminUserDetailsResponse
-        {
+            {
             Id = user.Id,
 
             FullName = user.FullName,
@@ -378,48 +395,48 @@ public class AdminRepository : IAdminRepository
             ChildrenCount = children.Count,
 
             Children = children
-        };
-    }
+            };
+        }
 
     public async Task<List<CategoryResponse>> GetAllCategoriesAsync(
         CancellationToken cancellationToken = default)
-    {
+        {
         return await _context.Categories
             .Where(c => !c.IsDeleted)
             .OrderBy(c => c.Name)
             .Select(c => new CategoryResponse
-            {
+                {
                 Id = c.Id,
                 Name = c.Name,
                 IsDeleted = c.IsDeleted,
                 IsInInitialAssessment = c.IsInInitialAssessment,
-            })
+                })
             .ToListAsync(cancellationToken);
-    }
+        }
     public async Task<CategoryResponse> CreateCategoryAsync(CreateCategoryRequest request, CancellationToken cancellationToken = default)
-    {
-        var category = new Category
         {
+        var category = new Category
+            {
             Id = Guid.NewGuid(),
             Name = request.Name
-        };
+            };
 
         _context.Categories.Add(category);
         await _context.SaveChangesAsync(cancellationToken);
 
         return new CategoryResponse
-        {
+            {
             Id = category.Id,
             Name = category.Name
-        };
-    }
+            };
+        }
 
 
     public async Task<CategoryResponse?> UpdateCategoryAsync(
     Guid id,
     UpdateCategoryRequest request,
     CancellationToken cancellationToken = default)
-    {
+        {
         var category = await _context.Categories
             .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
 
@@ -431,18 +448,18 @@ public class AdminRepository : IAdminRepository
         await _context.SaveChangesAsync(cancellationToken);
 
         return new CategoryResponse
-        {
+            {
             Id = category.Id,
             Name = category.Name,
 
 
-        };
-    }
+            };
+        }
 
     public async Task<bool> DeleteCategoryAsync(
       Guid id,
       CancellationToken cancellationToken = default)
-    {
+        {
         var category = await _context.Categories
             .Include(c => c.Activities)
             .FirstOrDefaultAsync(c => c.Id == id, cancellationToken);
@@ -453,12 +470,12 @@ public class AdminRepository : IAdminRepository
         category.IsDeleted = true;
 
         foreach (var activity in category.Activities)
-        {
+            {
             activity.IsDeleted = true;
-        }
+            }
 
         await _context.SaveChangesAsync(cancellationToken);
 
         return true;
+        }
     }
-}

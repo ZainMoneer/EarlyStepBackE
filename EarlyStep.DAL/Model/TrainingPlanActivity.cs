@@ -23,5 +23,5 @@ public class TrainingPlanActivity
     public bool IsCompleted { get; set; } = false;
     public DateTime? CompletedAt { get; set; }
 
-    public ICollection<TrainingPlanQuestionAnswer> Answers { get; set; } = [];
+    public ICollection<TrainingPlanQuestionAnswer> QuestionAnswers { get; set; } = new List<TrainingPlanQuestionAnswer>();
     }

@@ -3,7 +3,7 @@
 namespace EarlyStep.DAL.Model;
 
 public class InitialAssessmentSelectedQuestion
-{
+    {
     public Guid Id { get; set; }
 
     public Guid InitialAssessmentConfigId { get; set; }
@@ -16,4 +16,4 @@ public class InitialAssessmentSelectedQuestion
     public int Order { get; set; }
     public bool IsDeleted { get; set; }
 
-}
+    }

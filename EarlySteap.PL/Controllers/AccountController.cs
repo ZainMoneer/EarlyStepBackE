@@ -115,7 +115,6 @@ public class AuthController : ControllerBase
 
 
     [HttpPost("ForgotPassword")]
-    [HttpPost("forgot-password")]
     public async Task<IActionResult> ForgotPassword(
     [FromBody] ForgotPasswordRequest request,
     CancellationToken ct)

@@ -1,7 +1,7 @@
 ﻿using EarlyStep.DAL.Model;
 
 public class InitialAssessment
-{
+    {
     public Guid Id { get; set; }
 
     public Guid ChildId { get; set; }
@@ -11,4 +11,4 @@ public class InitialAssessment
     public double OverallScore { get; set; }
 
     public ICollection<InitialAssessmentQuestionResult> QuestionResults { get; set; } = [];
-}
+    }
