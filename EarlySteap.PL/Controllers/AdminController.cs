@@ -72,6 +72,17 @@ public class AdminController : ControllerBase
         return Ok(result);
         }
 
+    [HttpGet("specialists")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> GetAllSpecialists(
+        CancellationToken cancellationToken)
+        {
+        var specialists = await _adminRepository
+            .GetAllSpecialistsAsync(cancellationToken);
+
+        return Ok(specialists);
+        }
+
 
 
     [HttpPost("assign-children-to-specialist")]
