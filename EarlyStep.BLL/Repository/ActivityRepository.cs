@@ -59,27 +59,32 @@ public class ActivityRepository : IActivityRepository
             }).ToList();
         }
 
-    // GetActivityByIdAsync - تجيب نشاط واحد مع كل أسئلته وخياراته
+
     public async Task<ActivityResponse?> GetActivityByIdAsync(
         Guid id,
         ActivityType type,
         CancellationToken cancellationToken = default)
         {
         var activity = await _context.Activities
+            .AsNoTracking()
             .Include(x => x.Category)
             .Include(x => x.CreatedBy)
-            .Include(x => x.Questions)
-                .ThenInclude(x => x.Options)
-            .AsNoTracking()
+            .Include(x => x.Questions
+                .Where(q => !q.IsDeleted))
+                .ThenInclude(q => q.Options
+                    .Where(o => !o.IsDeleted))
             .FirstOrDefaultAsync(
-                x => x.Id == id && x.Type == type && !x.IsDeleted,
+                x => x.Id == id &&
+                     x.Type == type &&
+                     !x.IsDeleted,
                 cancellationToken);
 
-        if (activity == null)
+        if (activity is null)
             return null;
 
         return MapToAdminResponse(activity);
         }
+
     public async Task<List<CategoryResponse>> GetActivityCategoriesAsync(
         ActivityType type,
         CancellationToken cancellationToken = default)
@@ -304,7 +309,7 @@ public class ActivityRepository : IActivityRepository
                     OptionImageUrl = o.OptionImageUrl,
                     IsCorrect = o.IsCorrect,
                     CorrectOrder = o.CorrectOrder,
-                    Order= o.Order
+                    Order = o.Order
                     })
                 .ToList()
             };
@@ -402,7 +407,7 @@ public class ActivityRepository : IActivityRepository
 
             switch (request.Type.Value)
                 {
-         
+
 
                 case QuestionType.SingleChoice:
 
@@ -491,9 +496,10 @@ public class ActivityRepository : IActivityRepository
             };
         }
 
+
     public async Task<bool> DeleteQuestionAsync(
-    Guid questionId,
-    CancellationToken cancellationToken = default)
+        Guid questionId,
+        CancellationToken cancellationToken = default)
         {
         var question = await _context.ActivityQuestions
             .FirstOrDefaultAsync(
@@ -501,77 +507,125 @@ public class ActivityRepository : IActivityRepository
                      !q.IsDeleted,
                 cancellationToken);
 
-        if (question == null)
+        if (question is null)
             return false;
 
         question.IsDeleted = true;
+
+        var activity = await _context.Activities
+            .FirstOrDefaultAsync(
+                a => a.Id == question.ActivityId,
+                cancellationToken);
+
+        if (activity is not null)
+            {
+            activity.QuestionCount = await _context.ActivityQuestions
+                .CountAsync(q =>
+                    q.ActivityId == activity.Id &&
+                    !q.IsDeleted,
+                    cancellationToken);
+            }
 
         await _context.SaveChangesAsync(cancellationToken);
 
         return true;
         }
+
+
     public async Task<ActivityOptionResponse?> UpdateQuestionOptionAsync(
-     Guid optionId,
-     UpdateOptionRequest request,
-     CancellationToken cancellationToken = default)
+        Guid optionId,
+        UpdateOptionRequest request,
+        CancellationToken cancellationToken = default)
         {
+        // 1. Get option with its question
         var option = await _context.QuestionOptions
+            .Include(o => o.Question)
             .FirstOrDefaultAsync(
-                x => x.Id == optionId,
+                o => o.Id == optionId && !o.IsDeleted,
                 cancellationToken);
 
-        if (option == null)
+        if (option is null)
             return null;
-
-        if (request.OptionText != null)
-            {
-            option.OptionText = request.OptionText;
-            }
 
         if (request.Order.HasValue)
             {
-            option.Order = request.Order.Value;
+            var duplicateOrder = await _context.QuestionOptions
+                .AnyAsync(o =>
+                    o.QuestionId == option.QuestionId &&
+                    o.Id != optionId &&
+                    !o.IsDeleted &&
+                    o.Order == request.Order.Value,
+                    cancellationToken);
+
+            if (duplicateOrder)
+                {
+                throw new ArgumentException(
+                    "لا يمكن تكرار ترتيب الخيار (Order) داخل نفس السؤال.");
+                }
             }
+
+        if (option.Question.Type == QuestionType.SingleChoice &&
+            request.IsCorrect == true)
+            {
+            var anotherCorrectOption = await _context.QuestionOptions
+                .AnyAsync(o =>
+                    o.QuestionId == option.QuestionId &&
+                    o.Id != optionId &&
+                    !o.IsDeleted &&
+                    o.IsCorrect,
+                    cancellationToken);
+
+            if (anotherCorrectOption)
+                {
+                throw new ArgumentException(
+                    "سؤال SingleChoice يسمح بإجابة صحيحة واحدة فقط. قم بإلغاء الإجابة الصحيحة القديمة أولاً.");
+                }
+            }
+
+        if (request.OptionText != null)
+            option.OptionText = request.OptionText;
+
+        if (request.Order.HasValue)
+            option.Order = request.Order.Value;
 
         if (request.IsCorrect.HasValue)
-            {
             option.IsCorrect = request.IsCorrect.Value;
-            }
 
         if (request.CorrectOrder.HasValue)
-            {
             option.CorrectOrder = request.CorrectOrder.Value;
-            }
-    
 
         if (request.OptionImage != null &&
             request.OptionImage.Length > 0)
             {
-            if (!string.IsNullOrWhiteSpace(option.OptionImageUrl))
-                {
-                var oldFileName =
-                    Path.GetFileName(option.OptionImageUrl);
+            var newImageUrl = await FileSettings.UploadFileAsync(
+                request.OptionImage,
+                "question-options",
+                cancellationToken);
 
+            var oldImageUrl = option.OptionImageUrl;
+
+            option.OptionImageUrl = newImageUrl;
+
+            await _context.SaveChangesAsync(cancellationToken);
+
+            if (!string.IsNullOrWhiteSpace(oldImageUrl))
+                {
                 FileSettings.RemoveFile(
-                    oldFileName,
+                    Path.GetFileName(oldImageUrl),
                     "question-options");
                 }
-
-            option.OptionImageUrl =
-                await FileSettings.UploadFileAsync(
-                    request.OptionImage,
-                    "question-options",
-                    cancellationToken);
             }
-
-        if (string.IsNullOrWhiteSpace(option.OptionText) &&
-            string.IsNullOrWhiteSpace(option.OptionImageUrl))
+        else
             {
-            throw new ArgumentException(
-                "يجب أن يحتوي الخيار على نص أو صورة على الأقل.");
-            }
+            if (string.IsNullOrWhiteSpace(option.OptionText) &&
+                string.IsNullOrWhiteSpace(option.OptionImageUrl))
+                {
+                throw new ArgumentException(
+                    "يجب أن يحتوي الخيار على نص أو صورة على الأقل.");
+                }
 
-        await _context.SaveChangesAsync(cancellationToken);
+            await _context.SaveChangesAsync(cancellationToken);
+            }
 
         return new ActivityOptionResponse
             {
@@ -583,9 +637,10 @@ public class ActivityRepository : IActivityRepository
             CorrectOrder = option.CorrectOrder
             };
         }
-public async Task<bool> DeleteAllQuestionOptionsAsync(
-    Guid questionId,
-    CancellationToken cancellationToken = default)
+
+    public async Task<bool> DeleteAllQuestionOptionsAsync(
+        Guid questionId,
+        CancellationToken cancellationToken = default)
         {
         var options = await _context.QuestionOptions
             .Where(o => o.QuestionId == questionId)
@@ -675,7 +730,7 @@ public async Task<bool> DeleteAllQuestionOptionsAsync(
        int order,
        CancellationToken cancellationToken)
         {
-  
+
 
         if (string.IsNullOrWhiteSpace(request.QuestionText) &&
             request.QuestionImage == null)
@@ -701,7 +756,7 @@ public async Task<bool> DeleteAllQuestionOptionsAsync(
                 cancellationToken);
             }
         // إنشاء السؤال
-   
+
         var question = new ActivityQuestion
             {
             Id = Guid.NewGuid(),

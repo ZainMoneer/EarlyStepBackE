@@ -11,4 +11,6 @@ public class UserAdminResponse
 
     public string Role { get; set; }
     public bool EmailConfirmed { get; set; }
-    }
+    public bool isActive { get; set; }
+
+}

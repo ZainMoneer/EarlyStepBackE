@@ -978,7 +978,7 @@ namespace EarlyStep.DAL.Migrations
                     b.HasOne("TrainingPlanActivity", "TrainingPlanActivity")
                         .WithMany("QuestionAnswers")
                         .HasForeignKey("TrainingPlanActivityId")
-                        .OnDelete(DeleteBehavior.Restrict)
+                        .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("TrainingPlanActivity");

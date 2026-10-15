@@ -5,13 +5,13 @@ using Microsoft.EntityFrameworkCore;
 namespace EarlyStep.DAL.Data;
 
 public class ApplicationDbContext : IdentityDbContext<ApplicationUser, ApplicationRole, Guid>
-    {
+{
     public ApplicationDbContext(
         DbContextOptions<ApplicationDbContext> options)
         : base(options)
-        {
+    {
 
-        }
+    }
 
 
     public DbSet<Child> Children { get; set; }
@@ -43,7 +43,7 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     public DbSet<TrainingPlanQuestionAnswer> TrainingPlanQuestionAnswers { get; set; }
 
     protected override void OnModelCreating(ModelBuilder builder)
-        {
+    {
         base.OnModelCreating(builder);
 
         builder.ApplyConfigurationsFromAssembly(
@@ -123,11 +123,13 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
             .WithMany(c => c.Reports)
             .HasForeignKey(r => r.ChildId)
             .OnDelete(DeleteBehavior.Cascade);
+
         builder.Entity<TrainingPlanQuestionAnswer>()
-            .HasOne(a => a.TrainingPlanActivity)
-            .WithMany(a => a.QuestionAnswers)
-            .HasForeignKey(a => a.TrainingPlanActivityId)
-            .OnDelete(DeleteBehavior.Restrict);
+       .HasOne(a => a.TrainingPlanActivity)
+       .WithMany(a => a.QuestionAnswers)
+       .HasForeignKey(a => a.TrainingPlanActivityId)
+       .OnDelete(DeleteBehavior.Cascade);
+
         builder.Entity<Report>()
             .HasOne(r => r.Specialist)
             .WithMany(u => u.ReportsCreated)
@@ -204,5 +206,5 @@ public class ApplicationDbContext : IdentityDbContext<ApplicationUser, Applicati
     .HasConversion<string>();
 
 
-        }
     }
+}

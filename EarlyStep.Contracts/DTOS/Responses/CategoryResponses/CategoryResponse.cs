@@ -7,4 +7,6 @@ public class CategoryResponse
     public int Count { get; set; }
     public bool IsDeleted { get; set; } = false;
     public bool IsInInitialAssessment { get; set; } = false;
-}
+    public int ActivityCount { get; set; }
+
+    }

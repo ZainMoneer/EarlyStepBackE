@@ -134,8 +134,9 @@ public class SuperAdminRepository : ISuperAdminRepository
 
                 Role = roles.FirstOrDefault() ?? "",
 
-                EmailConfirmed = user.EmailConfirmed
-                });
+                EmailConfirmed = user.EmailConfirmed,
+                isActive = user.IsActive
+            });
             }
 
 
@@ -197,7 +198,6 @@ public class SuperAdminRepository : ISuperAdminRepository
         var email = request.Email?.Trim();
         var role = request.Role?.Trim();
 
-        // 1. Validate input
         if (string.IsNullOrWhiteSpace(fullName) ||
             string.IsNullOrWhiteSpace(email) ||
             string.IsNullOrWhiteSpace(role) ||
@@ -207,7 +207,6 @@ public class SuperAdminRepository : ISuperAdminRepository
                 "Full name, email, password and role are required.");
             }
 
-        // 2. Validate role
         if (!IsAllowedManagedRole(role) ||
             !await _roleManager.RoleExistsAsync(role))
             {
@@ -215,7 +214,6 @@ public class SuperAdminRepository : ISuperAdminRepository
                 "Invalid or unauthorized user role.");
             }
 
-        // 3. Check duplicate email
         var existingUser = await _userManager.FindByEmailAsync(email);
 
         if (existingUser is not null)
@@ -224,18 +222,19 @@ public class SuperAdminRepository : ISuperAdminRepository
                 "Email is already registered.");
             }
 
-        // 4. Create user
         var user = new ApplicationUser
-            {
+        {
             Id = Guid.NewGuid(),
             FullName = fullName,
             Email = email,
             UserName = email,
+
+            EmailConfirmed = true,
+
             IsActive = true,
             CreatedAt = DateTime.UtcNow
-            };
+        };
 
-        // 5. Save user with password
         var createResult = await _userManager.CreateAsync(
             user,
             request.Password);
@@ -247,7 +246,6 @@ public class SuperAdminRepository : ISuperAdminRepository
                     createResult.Errors.Select(e => e.Description)));
             }
 
-        // 6. Assign role
         var roleResult = await _userManager.AddToRoleAsync(
             user,
             role);
@@ -267,7 +265,6 @@ public class SuperAdminRepository : ISuperAdminRepository
                     roleResult.Errors.Select(e => e.Description)));
             }
 
-        // 7. Return user information
         return new UserManagementResponse
             {
             Message = "User created successfully.",
@@ -285,14 +282,12 @@ public class SuperAdminRepository : ISuperAdminRepository
         {
         cancellationToken.ThrowIfCancellationRequested();
 
-        // 1. Get user
         var user = await _userManager.FindByIdAsync(
             userId.ToString());
 
         if (user is null)
             return null;
 
-        // 2. Prevent editing SuperAdmin accounts
         if (await _userManager.IsInRoleAsync(user, "SuperAdmin"))
             {
             throw new InvalidOperationException(
@@ -303,7 +298,6 @@ public class SuperAdminRepository : ISuperAdminRepository
         var email = request.Email?.Trim();
         var newRole = request.Role?.Trim();
 
-        // 3. Validate input
         if (string.IsNullOrWhiteSpace(fullName) ||
             string.IsNullOrWhiteSpace(email) ||
             string.IsNullOrWhiteSpace(newRole))
@@ -312,7 +306,6 @@ public class SuperAdminRepository : ISuperAdminRepository
                 "Full name, email and role are required.");
             }
 
-        // 4. Validate new role
         if (!IsAllowedManagedRole(newRole) ||
             !await _roleManager.RoleExistsAsync(newRole))
             {
@@ -320,7 +313,6 @@ public class SuperAdminRepository : ISuperAdminRepository
                 "Invalid or unauthorized user role.");
             }
 
-        // 5. Check duplicate email
         var existingEmailUser =
             await _userManager.FindByEmailAsync(email);
 
@@ -331,17 +323,14 @@ public class SuperAdminRepository : ISuperAdminRepository
                 "Email is already registered.");
             }
 
-        // 6. Get existing roles
         var currentRoles = await _userManager.GetRolesAsync(user);
 
-        // 7. Start transaction
         await using var transaction =
             await _context.Database.BeginTransactionAsync(
                 cancellationToken);
 
         try
             {
-            // 8. Update user information
             user.FullName = fullName;
             user.Email = email;
             user.UserName = email;
@@ -356,7 +345,6 @@ public class SuperAdminRepository : ISuperAdminRepository
                         updateResult.Errors.Select(e => e.Description)));
                 }
 
-            // 9. Add new role if necessary
             if (!currentRoles.Contains(newRole))
                 {
                 var addResult = await _userManager.AddToRoleAsync(
@@ -371,7 +359,6 @@ public class SuperAdminRepository : ISuperAdminRepository
                     }
                 }
 
-            // 10. Remove old roles
             var oldRoles = currentRoles
                 .Where(r => r != newRole)
                 .ToArray();
@@ -391,10 +378,8 @@ public class SuperAdminRepository : ISuperAdminRepository
                     }
                 }
 
-            // 11. Commit transaction
             await transaction.CommitAsync(cancellationToken);
 
-            // 12. Return updated information
             return new UserManagementResponse
                 {
                 Message = "User updated successfully.",

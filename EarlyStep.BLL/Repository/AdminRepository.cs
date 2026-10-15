@@ -402,6 +402,7 @@ public class AdminRepository : IAdminRepository
         CancellationToken cancellationToken = default)
         {
         return await _context.Categories
+            .AsNoTracking()
             .Where(c => !c.IsDeleted)
             .OrderBy(c => c.Name)
             .Select(c => new CategoryResponse
@@ -410,6 +411,10 @@ public class AdminRepository : IAdminRepository
                 Name = c.Name,
                 IsDeleted = c.IsDeleted,
                 IsInInitialAssessment = c.IsInInitialAssessment,
+
+                ActivityCount = _context.Activities.Count(a =>
+                    a.CategoryId == c.Id &&
+                    !a.IsDeleted)
                 })
             .ToListAsync(cancellationToken);
         }
